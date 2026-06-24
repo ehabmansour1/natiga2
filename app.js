@@ -74,7 +74,7 @@ function el(tag, cls, html) {
 const SECTOR_LABEL = { N: "قطاع شمال", S: "قطاع جنوب", C: "قطاع وسط", "شمال": "قطاع شمال", "جنوب": "قطاع جنوب", "وسط": "قطاع وسط" };
 
 /* ━━━ الحالة ━━━ */
-const State = { students: [], index: new Map(), source: "loading" };
+const State = { students: [], index: new Map(), source: "loading", govTotal: 0 };
 
 async function loadData() {
   try {
@@ -83,8 +83,13 @@ async function loadData() {
       const data = await res.json();
       const f = data.fields;
       const gi = {}; // grade key → column index
-      const meta = { seat: f.indexOf("seat"), name: f.indexOf("name"), school: f.indexOf("school"), gender: f.indexOf("gender"), sector: f.indexOf("sector") };
+      const meta = {
+        seat: f.indexOf("seat"), name: f.indexOf("name"), school: f.indexOf("school"),
+        gender: f.indexOf("gender"), sector: f.indexOf("sector"),
+        govRank: f.indexOf("govRank"), schoolRank: f.indexOf("schoolRank"), schoolCount: f.indexOf("schoolCount"),
+      };
       [...MAIN_SUBJECTS, GRAND_TOTAL, ...EXTRA_SUBJECTS].forEach(s => { gi[s.key] = f.indexOf(s.key); });
+      State.govTotal = data.govTotal || 0;
       const students = data.rows.map(r => {
         const grades = {};
         for (const k in gi) grades[k] = gi[k] >= 0 ? r[gi[k]] : null;
@@ -94,6 +99,9 @@ async function loadData() {
           school: r[meta.school] || "",
           gender: r[meta.gender] || "",
           sector: r[meta.sector] || "",
+          govRank: meta.govRank >= 0 ? r[meta.govRank] : null,
+          schoolRank: meta.schoolRank >= 0 ? r[meta.schoolRank] : null,
+          schoolCount: meta.schoolCount >= 0 ? r[meta.schoolCount] : null,
           grades,
         };
         st._k = normalizeAr(st.name);
@@ -327,6 +335,29 @@ function renderResult(student) {
        <div class="vstat"><b>${r.grade}</b><span>التقدير</span></div>
      </div>`;
   inner.appendChild(verdict);
+
+  // شريط الترتيب (المدرسة / المحافظة)
+  if (student.schoolRank != null || student.govRank != null) {
+    const arNum = n => (n == null ? "—" : Number(n).toLocaleString("ar-EG"));
+    const CAP = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-4 9 4-9 4z"/><path d="M7 11v4c0 1.2 2.5 2.2 5 2.2s5-1 5-2.2v-4"/><path d="M21 9v4"/></svg>`;
+    const PIN = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.6 7-13a7 7 0 1 0-14 0c0 5.4 7 13 7 13z"/><circle cx="12" cy="9" r="2.6"/></svg>`;
+    const TROPHY = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M6 4h12v4a6 6 0 0 1-12 0zM6 5H4a2 2 0 0 0 0 4h2m12-4h2a2 2 0 0 1 0 4h-2"/></svg>`;
+    const ranks = el("div", "ranks reveal");
+    ranks.style.animationDelay = ".12s";
+    const sFirst = student.schoolRank === 1, gFirst = student.govRank === 1;
+    const card = (cls, icon, label, rank, total, ordinalFirst) => `
+      <div class="rank-card${cls}">
+        <span class="rank-card__ic">${icon}</span>
+        <span class="rank-card__txt">
+          <span class="rank-card__label">${label}</span>
+          <span class="rank-card__value">${rank === 1 ? "<b>الأول</b>" : "<b>" + arNum(rank) + "</b>"} <small>من ${arNum(total)}</small></span>
+        </span>
+      </div>`;
+    ranks.innerHTML =
+      card(sFirst ? " is-first" : "", sFirst ? TROPHY : CAP, "الترتيب على المدرسة", student.schoolRank, student.schoolCount) +
+      card(gFirst ? " is-first" : "", gFirst ? TROPHY : PIN, "الترتيب على المحافظة", student.govRank, State.govTotal);
+    inner.appendChild(ranks);
+  }
 
   const main = el("div", "grades reveal"); main.style.animationDelay = ".15s";
   main.appendChild(el("h3", "grades__cap", "درجات المواد الدراسية"));

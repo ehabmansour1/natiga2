@@ -257,22 +257,68 @@ def main():
         write_compact(allst, os.path.join(base, "data", "students.json"), out_txt)
     print("OK -> _parse_report.txt")
 
+def _rank_competition(members):
+    """ترتيب تنافسي تنازلي حسب المجموع الكلي (المتساوون نفس الترتيب)."""
+    mem = [s for s in members if s["grades"].get("grandTotal") is not None]
+    mem.sort(key=lambda s: -s["grades"]["grandTotal"])
+    last, rank = None, 0
+    for i, s in enumerate(mem):
+        gt = s["grades"]["grandTotal"]
+        if gt != last:
+            rank, last = i + 1, gt
+        s["_rank"] = rank
+
+def compute_ranks(students):
+    """يحسب الترتيب على المحافظة وعلى المدرسة لكل طالب."""
+    from collections import defaultdict
+    # المحافظة (كل القطاعات)
+    _rank_competition(students)
+    for s in students:
+        s["govRank"] = s.pop("_rank", None)
+    gov_total = sum(1 for s in students if s["grades"].get("grandTotal") is not None)
+    # المدرسة (مجموعة حسب القطاع + الإدارة + المدرسة لتفادي دمج المتشابهة)
+    groups = defaultdict(list)
+    for s in students:
+        groups[(s.get("sector", ""), s.get("directorate", ""), s.get("school", ""))].append(s)
+    for members in groups.values():
+        _rank_competition(members)
+        cnt = sum(1 for s in members if s["grades"].get("grandTotal") is not None)
+        for s in members:
+            s["schoolRank"] = s.pop("_rank", None)
+            s["schoolCount"] = cnt
+    return gov_total
+
+SECTOR_CODE = {"شمال": "N", "جنوب": "S", "وسط": "C"}
+
+def _num(v):
+    if isinstance(v, float) and v.is_integer():
+        return int(v)
+    return v
+
 def write_compact(students, path, out_txt):
-    """تنسيق مدمج: مصفوفة صفوف [seat,name,school,gender,sector, ...13 درجة]."""
+    """تنسيق مدمج: [seat,name,school,gender,sector, ...13 درجة, govRank, schoolRank, schoolCount]."""
+    gov_total = compute_ranks(students)
     GKEYS = ACADEMIC + EXTRAS
+    EXTRA_COLS = ["govRank", "schoolRank", "schoolCount"]
     rows = []
     for s in students:
         g = s["grades"]
         rows.append([
-            s["seat"], s["name"], s["school"], s["gender"], s["sector"],
-            *[g.get(k) for k in GKEYS],
+            s["seat"], s["name"], s["school"], s["gender"], SECTOR_CODE.get(s["sector"], s["sector"]),
+            *[_num(g.get(k)) for k in GKEYS],
+            *[s.get(k) for k in EXTRA_COLS],
         ])
-    payload = {"fields": ["seat", "name", "school", "gender", "sector"] + GKEYS, "rows": rows}
+    payload = {
+        "fields": ["seat", "name", "school", "gender", "sector"] + GKEYS + EXTRA_COLS,
+        "sectorMap": {"N": "شمال", "S": "جنوب", "C": "وسط"},
+        "govTotal": gov_total,
+        "rows": rows,
+    }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
     size = os.path.getsize(path)
     with open(out_txt, "a", encoding="utf-8") as f:
-        f.write(f"\nWROTE {path} ({size/1024/1024:.2f} MB, {len(rows)} students)\n")
+        f.write(f"\nWROTE {path} ({size/1024/1024:.2f} MB, {len(rows)} students, govTotal={gov_total})\n")
 
 if __name__ == "__main__":
     main()
