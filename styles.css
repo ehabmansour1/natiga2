@@ -405,6 +405,20 @@ body {
 .dev-credit svg { color: #25d366; }
 .dev-credit:hover { color: var(--ink-deep); border-color: var(--gold); }
 
+/* عدّاد الزيارات */
+.visit-counter {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0 auto 14px;
+  font-family: var(--f-head); font-size: .85rem; color: var(--ink);
+  background: var(--paper-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 7px 16px; box-shadow: var(--shadow);
+  animation: rise .5s ease both;
+}
+.visit-counter svg { color: var(--gold); }
+.visit-counter strong {
+  font-weight: 700; color: var(--ink-deep); font-variant-numeric: tabular-nums;
+  letter-spacing: .5px; min-width: 1ch;
+}
+
 /* ============================================================
    Animations
    ============================================================ */

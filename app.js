@@ -13,6 +13,9 @@ const CONFIG = {
   dataPath: "data/students.json",
 };
 
+// عدّاد الزيارات (خدمة مجانية بدون تسجيل). غيّر namespace لاسم فريد لموقعك.
+const COUNTER = { enabled: true, namespace: "natiga-minya-2026", key: "visits" };
+
 /* ━━━ المواد ━━━ */
 // judged: مادة يُحسب النجاح/الرسوب بناءً عليها (تظهر إشارة ✓/✕).
 // الجبر والهندسة مكوّنان للرياضيات؛ الحكم يكون على "مجموع الرياضيات" فقط.
@@ -151,8 +154,46 @@ const dom = {
   backBtn: document.getElementById("backBtn"),
   printBtn: document.getElementById("printBtn"),
   brandHome: document.getElementById("brandHome"),
+  counterWrap: document.getElementById("counterWrap"),
+  visitCount: document.getElementById("visitCount"),
 };
 let mode = "seat";
+
+/* ━━━ عدّاد الزيارات ━━━ */
+async function loadCounter() {
+  if (!COUNTER.enabled || !dom.counterWrap) return;
+  const { namespace: ns, key } = COUNTER;
+  const firstVisit = !sessionStorage.getItem("nt_visited");
+  let value = null;
+  // 1) Abacus
+  try {
+    const r = await fetch(`https://abacus.jasoncameron.dev/${firstVisit ? "hit" : "get"}/${ns}/${key}`);
+    if (r.ok) { const j = await r.json(); if (typeof j.value === "number") value = j.value; }
+  } catch (e) { /* offline */ }
+  // 2) احتياطي عند أول زيارة فقط
+  if (value == null && firstVisit) {
+    try {
+      const r = await fetch(`https://api.counterapi.dev/v1/${ns}/${key}/up`);
+      if (r.ok) { const j = await r.json(); if (typeof j.count === "number") value = j.count; }
+    } catch (e) {}
+  }
+  if (value == null) { dom.counterWrap.hidden = true; return; }
+  if (firstVisit) sessionStorage.setItem("nt_visited", "1");
+  dom.counterWrap.hidden = false;
+  animateCount(dom.visitCount, value);
+}
+
+function animateCount(node, to) {
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce || to < 1) { node.textContent = Number(to).toLocaleString("ar-EG"); return; }
+  const dur = 900, t0 = performance.now();
+  (function tick(now) {
+    const p = Math.min(1, (now - t0) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    node.textContent = Math.round(to * eased).toLocaleString("ar-EG");
+    if (p < 1) requestAnimationFrame(tick);
+  })(t0);
+}
 
 function setMode(next) {
   mode = next;
@@ -353,6 +394,8 @@ async function init() {
   dom.backBtn.addEventListener("click", goHome);
   dom.printBtn.addEventListener("click", () => window.print());
   dom.brandHome.addEventListener("click", e => { e.preventDefault(); goHome(); });
+
+  loadCounter();
 
   dom.dataBadge.hidden = false;
   dom.dataBadge.classList.add("is-loading");
