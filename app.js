@@ -74,7 +74,7 @@ function el(tag, cls, html) {
 const SECTOR_LABEL = { N: "قطاع شمال", S: "قطاع جنوب", C: "قطاع وسط", "شمال": "قطاع شمال", "جنوب": "قطاع جنوب", "وسط": "قطاع وسط" };
 
 /* ━━━ الحالة ━━━ */
-const State = { students: [], index: new Map(), source: "loading", govTotal: 0 };
+const State = { students: [], index: new Map(), source: "loading", govTotal: 0, current: null };
 
 async function loadData() {
   try {
@@ -161,6 +161,7 @@ const dom = {
   dataBadge: document.getElementById("dataBadge"),
   backBtn: document.getElementById("backBtn"),
   printBtn: document.getElementById("printBtn"),
+  certBtn: document.getElementById("certBtn"),
   brandHome: document.getElementById("brandHome"),
   counterWrap: document.getElementById("counterWrap"),
   visitCount: document.getElementById("visitCount"),
@@ -295,6 +296,7 @@ function gradeTable(student, defs) {
 
 /* ━━━ بطاقة النتيجة ━━━ */
 function renderResult(student) {
+  State.current = student;
   const r = computeResult(student);
   const inner = el("div", "cert-inner");
 
@@ -418,12 +420,179 @@ function goHome() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   شهادة تقدير (PNG عالية الدقة — تُرسم على Canvas)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+const toAr = s => String(s).replace(/[0-9]/g, d => "٠١٢٣٤٥٦٧٨٩"[d]);
+
+async function onCertClick() {
+  if (!State.current) return;
+  const btn = dom.certBtn;
+  btn.classList.add("is-busy");
+  const old = btn.querySelector("span") ? null : btn.lastChild;
+  try {
+    await drawAppreciation(State.current);
+  } catch (e) {
+    console.error(e);
+    alert("تعذّر إنشاء الشهادة. حاول مرة أخرى.");
+  } finally {
+    btn.classList.remove("is-busy");
+  }
+}
+
+function star8(x, ctx, cx, cy, rOut, rIn) {
+  ctx.beginPath();
+  for (let i = 0; i < 16; i++) {
+    const a = (Math.PI / 8) * i - Math.PI / 2;
+    const r = i % 2 ? rIn : rOut;
+    ctx[i ? "lineTo" : "moveTo"](cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+  }
+  ctx.closePath();
+}
+
+async function drawAppreciation(student) {
+  const r = computeResult(student);
+  const isF = (student.gender || "").includes("أنث");
+  const C = {
+    ink: "#0e4a42", inkDeep: "#07332d", gold: "#c2982f", goldB: "#d8af49",
+    paper: "#f3ecd8", sheet: "#fffdf7", muted: "#7a6f59", line: "#d8cdb4",
+  };
+  // تأكد من تحميل الخطوط قبل الرسم
+  try {
+    await Promise.all([
+      document.fonts.load("700 130px 'Aref Ruqaa'"),
+      document.fonts.load("400 90px 'Aref Ruqaa'"),
+      document.fonts.load("700 64px 'Reem Kufi'"),
+      document.fonts.load("500 44px 'Tajawal'"),
+      document.fonts.load("700 44px 'Tajawal'"),
+    ]);
+    await document.fonts.ready;
+  } catch (e) { /* fallback fonts */ }
+
+  const W = 2000, H = 1414, cx = W / 2;
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const x = cv.getContext("2d");
+  x.direction = "rtl"; x.textAlign = "center"; x.textBaseline = "middle";
+
+  const center = (t, y, font, color, ls) => {
+    x.font = font; x.fillStyle = color;
+    if (ls) x.letterSpacing = ls + "px";
+    x.fillText(t, cx, y);
+    if (ls) x.letterSpacing = "0px";
+  };
+
+  // خلفية
+  x.fillStyle = C.paper; x.fillRect(0, 0, W, H);
+  // ورقة داخلية
+  const m = 56;
+  x.fillStyle = C.sheet;
+  x.beginPath(); x.roundRect(m, m, W - 2 * m, H - 2 * m, 22); x.fill();
+
+  // علامة مائية (نجمة باهتة)
+  x.save(); x.globalAlpha = 0.05; x.fillStyle = C.ink;
+  star8(x, x, cx, H / 2 + 40, 470, 200); x.fill(); x.restore();
+
+  // إطار ذهبي مزدوج
+  x.strokeStyle = C.gold; x.lineWidth = 5;
+  x.beginPath(); x.roundRect(m + 22, m + 22, W - 2 * (m + 22), H - 2 * (m + 22), 14); x.stroke();
+  x.strokeStyle = C.goldB; x.lineWidth = 2;
+  x.beginPath(); x.roundRect(m + 34, m + 34, W - 2 * (m + 34), H - 2 * (m + 34), 10); x.stroke();
+  // زخارف الأركان
+  [[m + 70, m + 70], [W - m - 70, m + 70], [m + 70, H - m - 70], [W - m - 70, H - m - 70]].forEach(([px, py]) => {
+    x.fillStyle = C.gold; star8(x, x, px, py, 24, 10); x.fill();
+  });
+
+  // شعار علوي
+  x.save(); x.translate(cx, 218);
+  x.fillStyle = C.gold; star8(x, x, 0, 0, 54, 23); x.fill();
+  x.fillStyle = C.sheet; x.beginPath(); x.arc(0, 0, 20, 0, 7); x.fill();
+  x.fillStyle = C.ink; x.beginPath(); x.arc(0, 0, 11, 0, 7); x.fill();
+  x.restore();
+
+  // العنوان
+  center("شهادة تقدير", 360, "700 132px 'Aref Ruqaa', serif", C.inkDeep);
+  // فاصل زخرفي
+  x.strokeStyle = C.gold; x.lineWidth = 2.5;
+  x.beginPath(); x.moveTo(cx - 230, 442); x.lineTo(cx - 34, 442); x.moveTo(cx + 34, 442); x.lineTo(cx + 230, 442); x.stroke();
+  x.fillStyle = C.gold; x.font = "400 40px 'Reem Kufi'"; x.fillText("۞", cx, 444);
+
+  // مقدمة
+  center("تتقدّم مديرية التربية والتعليم بالمنيا بأطيب التهاني والتقدير", 540, "500 46px 'Tajawal', sans-serif", C.muted);
+  center(isF ? "إلى الطالبة المتميّزة" : "إلى الطالب المتميّز", 606, "700 48px 'Reem Kufi', sans-serif", C.ink);
+
+  // الاسم
+  center(student.name || "—", 712, "700 92px 'Aref Ruqaa', serif", C.inkDeep);
+  // تسطير الاسم
+  const nameW = Math.min(W - 320, x.measureText(student.name || "—").width + 120);
+  x.strokeStyle = C.gold; x.lineWidth = 3;
+  x.beginPath(); x.moveTo(cx - nameW / 2, 772); x.lineTo(cx - 22, 772); x.moveTo(cx + 22, 772); x.lineTo(cx + nameW / 2, 772); x.stroke();
+  x.fillStyle = C.gold; x.beginPath(); x.moveTo(cx, 764); x.lineTo(cx + 11, 772); x.lineTo(cx, 780); x.lineTo(cx - 11, 772); x.closePath(); x.fill();
+
+  // سبب التكريم
+  const reason = r.kind === "pass"
+    ? `${isF ? "لحصولها" : "لحصوله"} على تقدير «${r.grade}» في نتيجة الشهادة الإعدادية`
+    : `${isF ? "لاجتيازها" : "لاجتيازه"} امتحان الشهادة الإعدادية`;
+  center(reason, 840, "500 48px 'Tajawal', sans-serif", C.ink);
+  center(`للعام الدراسي ${toAr("2025 / 2026")}`, 902, "500 40px 'Tajawal', sans-serif", C.muted);
+
+  // بطاقات الإحصاء (صفّان × بطاقتان)
+  const chip = (label, value, ccx, ccy) => {
+    x.font = "700 40px 'Reem Kufi', sans-serif";
+    const vw = x.measureText(value).width;
+    x.font = "500 34px 'Tajawal', sans-serif";
+    const lw = x.measureText(label).width;
+    const w = Math.max(vw, lw) + 90, h = 116;
+    x.fillStyle = "rgba(194,152,47,0.10)";
+    x.strokeStyle = C.line; x.lineWidth = 2;
+    x.beginPath(); x.roundRect(ccx - w / 2, ccy - h / 2, w, h, 16); x.fill(); x.stroke();
+    x.fillStyle = C.muted; x.font = "500 32px 'Tajawal', sans-serif"; x.fillText(label, ccx, ccy - 26);
+    x.fillStyle = C.inkDeep; x.font = "700 42px 'Reem Kufi', sans-serif"; x.fillText(value, ccx, ccy + 22);
+    return w;
+  };
+  const total = toAr(fmtNum(r.total)), max = toAr(GRAND_TOTAL.max), pct = toAr(r.pct.toFixed(1));
+  // الصف الأول: المجموع + النسبة
+  chip("المجموع الكلي", `${total} / ${max}`, cx + 250, 1030);
+  chip("النسبة المئوية", `${pct}٪`, cx - 250, 1030);
+  // الصف الثاني: الترتيبان (إن وُجدا)
+  if (student.schoolRank != null || student.govRank != null) {
+    const sr = student.schoolRank === 1 ? "الأول" : toAr(student.schoolRank);
+    const gr = student.govRank === 1 ? "الأول" : toAr(student.govRank);
+    chip("الترتيب على المدرسة", `${sr} / ${toAr(student.schoolCount)}`, cx + 250, 1166);
+    chip("الترتيب على المحافظة", `${gr} / ${toAr(State.govTotal)}`, cx - 250, 1166);
+  } else {
+    center(student.school || "", 1150, "500 40px 'Tajawal', sans-serif", C.muted);
+  }
+
+  // ختم سفلي + التوقيع
+  x.save(); x.translate(cx, 1268);
+  x.strokeStyle = C.gold; x.lineWidth = 4; x.beginPath(); x.arc(0, 0, 78, 0, 7); x.stroke();
+  x.lineWidth = 2; x.beginPath(); x.arc(0, 0, 66, 0, 7); x.stroke();
+  x.fillStyle = C.gold; x.font = "400 26px 'Reem Kufi'"; x.fillText("تقدير", 0, -22);
+  x.fillStyle = C.inkDeep; x.font = "700 46px 'Aref Ruqaa'"; x.fillText(r.kind === "pass" ? r.grade.split(" ")[0] : "ناجح", 0, 18);
+  x.restore();
+
+  // التذييل: رقم الجلوس + المدرسة
+  x.fillStyle = C.muted; x.font = "500 32px 'Tajawal', sans-serif";
+  x.textAlign = "right"; x.fillText(`رقم الجلوس: ${toAr(student.seat)}`, W - m - 60, H - m - 70);
+  x.textAlign = "left"; x.fillText(`${student.school || ""}`, m + 60, H - m - 70);
+  x.textAlign = "center";
+
+  // تنزيل
+  const blob = await new Promise(res => cv.toBlob(res, "image/png"));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `شهادة-تقدير-${student.seat}.png`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
 /* ━━━ التهيئة ━━━ */
 async function init() {
   dom.segBtns.forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
   dom.form.addEventListener("submit", doSearch);
   dom.backBtn.addEventListener("click", goHome);
   dom.printBtn.addEventListener("click", () => window.print());
+  dom.certBtn.addEventListener("click", onCertClick);
   dom.brandHome.addEventListener("click", e => { e.preventDefault(); goHome(); });
 
   loadCounter();

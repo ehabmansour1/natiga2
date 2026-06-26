@@ -262,8 +262,12 @@ body {
   background: linear-gradient(160deg, var(--ink-soft), var(--ink) 60%, var(--ink-deep));
   box-shadow: 0 10px 22px -12px rgba(7,51,45,.9); }
 .action--ghost { color: var(--ink); background: var(--paper-2); border: 1.5px solid var(--line); }
+.action--gold { color: var(--ink-deep); border: 0;
+  background: linear-gradient(160deg, var(--gold-bright), var(--gold) 70%, #a9791b);
+  box-shadow: 0 10px 22px -12px rgba(194,152,47,.9); }
 .action:hover { transform: translateY(-1px); filter: brightness(1.04); }
 .action--ghost:hover { border-color: var(--gold); }
+.action.is-busy { opacity: .7; pointer-events: none; }
 
 /* ============================================================
    Certificate
