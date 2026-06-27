@@ -252,7 +252,7 @@ body {
    Result actions
    ============================================================ */
 .result-view { padding-top: 28px; animation: rise .45s ease both; }
-.result-actions { display: flex; gap: 12px; justify-content: center; margin-bottom: 22px; }
+.result-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 22px; }
 .action {
   display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
   font-family: var(--f-head); font-weight: 700; font-size: .95rem;

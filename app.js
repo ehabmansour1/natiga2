@@ -551,14 +551,14 @@ async function drawAppreciation(student) {
   };
   const total = toAr(fmtNum(r.total)), max = toAr(GRAND_TOTAL.max), pct = toAr(r.pct.toFixed(1));
   // الصف الأول: المجموع + النسبة
-  chip("المجموع الكلي", `${total} / ${max}`, cx + 250, 1030);
+  chip("المجموع الكلي", `${total} من ${max}`, cx + 250, 1030);
   chip("النسبة المئوية", `${pct}٪`, cx - 250, 1030);
   // الصف الثاني: الترتيبان (إن وُجدا)
   if (student.schoolRank != null || student.govRank != null) {
     const sr = student.schoolRank === 1 ? "الأول" : toAr(student.schoolRank);
     const gr = student.govRank === 1 ? "الأول" : toAr(student.govRank);
-    chip("الترتيب على المدرسة", `${sr} / ${toAr(student.schoolCount)}`, cx + 250, 1166);
-    chip("الترتيب على المحافظة", `${gr} / ${toAr(State.govTotal)}`, cx - 250, 1166);
+    chip("الترتيب على المدرسة", `${sr} من ${toAr(student.schoolCount)}`, cx + 250, 1166);
+    chip("الترتيب على المحافظة", `${gr} من ${toAr(State.govTotal)}`, cx - 250, 1166);
   } else {
     center(student.school || "", 1150, "500 40px 'Tajawal', sans-serif", C.muted);
   }
